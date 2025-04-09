@@ -13,8 +13,12 @@ from py_factor_graph.utils.solver_utils import (
     SolverResults,
     save_to_tum,
 )
-from py_factor_graph.variables import PoseVariable2D, PoseVariable3D, LandmarkVariable2D, LandmarkVariable3D
-from py_factor_graph.measurements import FGRangeMeasurement
+from py_factor_graph.variables import (
+    PoseVariable2D,
+    PoseVariable3D,
+    LandmarkVariable2D,
+    LandmarkVariable3D,
+)
 from py_factor_graph.utils.matrix_utils import get_theta_from_rotation_matrix
 
 COLORS = ["blue", "red", "green", "yellow", "black", "cyan", "magenta"]
@@ -60,6 +64,7 @@ def draw_arrow(
         color=color,
     )
 
+
 def draw_arrow_3d(
     ax: plt.Axes,
     x: float,
@@ -95,10 +100,11 @@ def draw_arrow_3d(
         dx,
         dy,
         dz,
-        length = quiver_length * 5.0,
-        color = color,
-        normalize = True,
+        length=quiver_length * 5.0,
+        color=color,
+        normalize=True,
     )
+
 
 def draw_line(
     ax: plt.Axes,
@@ -136,6 +142,7 @@ def draw_line(
     ax.add_line(line)
     return line
 
+
 def draw_line_3d(
     ax: plt.Axes,
     x_start: float,
@@ -172,9 +179,12 @@ def draw_line_3d(
             linewidth=0.5,
         )
     else:
-        line = art3d.Line3D([x_start, x_end], [y_start, y_end], [z_start, z_end],color=color)
+        line = art3d.Line3D(
+            [x_start, x_end], [y_start, y_end], [z_start, z_end], color=color
+        )
     ax.add_line(line)
     return line
+
 
 def draw_circle(ax: plt.Axes, circle: np.ndarray, color="red") -> mpatches.Circle:
     assert circle.size == 3
@@ -196,6 +206,7 @@ def _get_pose_xytheta(
         y = pose[1, 2]
         theta = get_theta_from_rotation_matrix(pose[0:2, 0:2])
     return x, y, theta
+
 
 def _get_pose_3d(
     pose: Union[np.ndarray, PoseVariable3D],
@@ -237,6 +248,7 @@ def draw_pose(
         quiver_width=scale / 10,
     )
 
+
 def draw_pose_3d(
     ax: plt.Axes,
     pose: Union[np.ndarray, PoseVariable3D],
@@ -256,6 +268,7 @@ def draw_pose_3d(
         quiver_length=scale,
     )
 
+
 def update_pose_arrow(
     arrow: mpatches.FancyArrow,
     pose: Union[np.ndarray, PoseVariable2D],
@@ -266,6 +279,7 @@ def update_pose_arrow(
     dx = quiver_length * math.cos(theta)
     dy = quiver_length * math.sin(theta)
     arrow.set_data(x=x, y=y, dx=dx, dy=dy)
+
 
 def draw_traj(
     ax: plt.Axes,
@@ -278,6 +292,7 @@ def draw_traj(
     ax.add_line(line)
     return line
 
+
 def draw_traj_3d(
     ax: plt.Axes,
     x_traj: Sequence[float],
@@ -285,10 +300,15 @@ def draw_traj_3d(
     z_traj: Sequence[float],
     color: str = "black",
 ) -> art3d.Line3D:
-    assert len(x_traj) == len(y_traj) and len(x_traj) == len(z_traj) and len(y_traj) == len(z_traj)
+    assert (
+        len(x_traj) == len(y_traj)
+        and len(x_traj) == len(z_traj)
+        and len(y_traj) == len(z_traj)
+    )
     line = art3d.Line3D(x_traj, y_traj, z_traj, color=color)
     ax.add_line(line)
     return line
+
 
 def update_traj(
     line: mlines.Line2D,
@@ -305,11 +325,13 @@ def draw_landmark_variable(ax: plt.Axes, landmark: LandmarkVariable2D):
     true_y = landmark.true_y
     ax.scatter(true_x, true_y, color="green", marker=(5, 2))
 
+
 def draw_landmark_variable_3d(ax: plt.Axes, landmark: LandmarkVariable3D):
     true_x = landmark.true_x
     true_y = landmark.true_y
     true_z = landmark.true_z
-    ax.scatter(true_x, true_y, true_z, c="green", marker = (5, 2))
+    ax.scatter(true_x, true_y, true_z, c="green", marker=(5, 2))
+
 
 def draw_loop_closure_measurement(
     ax: plt.Axes, base_loc: np.ndarray, to_pose: PoseVariable2D
@@ -327,57 +349,59 @@ def draw_loop_closure_measurement(
     return line, arrow
 
 
-def draw_range_measurement(
-    ax: plt.Axes,
-    range_measure: FGRangeMeasurement,
-    from_pose: PoseVariable2D,
-    to_landmark: Union[LandmarkVariable2D, PoseVariable2D],
-    add_line: bool = True,
-    add_circle: bool = True,
-) -> Tuple[Optional[mlines.Line2D], Optional[mpatches.Circle]]:
-    base_loc = from_pose.true_x, from_pose.true_y
-    to_loc = to_landmark.true_x, to_landmark.true_y
+# def draw_range_measurement(
+#     ax: plt.Axes,
+#     range_measure: FGRangeMeasurement,
+#     from_pose: PoseVariable2D,
+#     to_landmark: Union[LandmarkVariable2D, PoseVariable2D],
+#     add_line: bool = True,
+#     add_circle: bool = True,
+# ) -> Tuple[Optional[mlines.Line2D], Optional[mpatches.Circle]]:
+#     base_loc = from_pose.true_x, from_pose.true_y
+#     to_loc = to_landmark.true_x, to_landmark.true_y
 
-    x_start, y_start = base_loc
-    landmark_idx = int(to_landmark.name[1:])
-    c = get_color(landmark_idx)
-    c = "grey"
+#     x_start, y_start = base_loc
+#     landmark_idx = int(to_landmark.name[1:])
+#     c = get_color(landmark_idx)
+#     c = "grey"
 
-    if add_line:
-        x_end, y_end = to_loc
-        line = draw_line(ax, x_start, y_start, x_end, y_end, color=c)
-    else:
-        line = None
-    if add_circle:
-        dist = range_measure.dist
-        circle = draw_circle(ax, np.array([x_start, y_start, dist]), color=c)
-    else:
-        circle = None
+#     if add_line:
+#         x_end, y_end = to_loc
+#         line = draw_line(ax, x_start, y_start, x_end, y_end, color=c)
+#     else:
+#         line = None
+#     if add_circle:
+#         dist = range_measure.dist
+#         circle = draw_circle(ax, np.array([x_start, y_start, dist]), color=c)
+#     else:
+#         circle = None
 
-    return line, circle
+#     return line, circle
 
-def draw_range_measurement_3d(
-    ax: plt.Axes,
-    range_measure: FGRangeMeasurement,
-    from_pose: PoseVariable3D,
-    to_landmark: Union[LandmarkVariable3D, PoseVariable3D],
-    add_line: bool = True,
-) -> Optional[mlines.Line2D]:
-    base_loc = from_pose.true_x, from_pose.true_y, from_pose.true_z
-    to_loc = to_landmark.true_x, to_landmark.true_y, to_landmark.true_z
 
-    x_start, y_start, z_start = base_loc
-    landmark_idx = int(to_landmark.name[1:])
-    c = get_color(landmark_idx)
-    c = "grey"
+# def draw_range_measurement_3d(
+#     ax: plt.Axes,
+#     range_measure: FGRangeMeasurement,
+#     from_pose: PoseVariable3D,
+#     to_landmark: Union[LandmarkVariable3D, PoseVariable3D],
+#     add_line: bool = True,
+# ) -> Optional[mlines.Line2D]:
+#     base_loc = from_pose.true_x, from_pose.true_y, from_pose.true_z
+#     to_loc = to_landmark.true_x, to_landmark.true_y, to_landmark.true_z
 
-    if add_line:
-        x_end, y_end, z_end = to_loc
-        line = draw_line_3d(ax, x_start, y_start, z_start, x_end, y_end, z_end, color=c)
-    else:
-        line = None
+#     x_start, y_start, z_start = base_loc
+#     landmark_idx = int(to_landmark.name[1:])
+#     c = get_color(landmark_idx)
+#     c = "grey"
 
-    return line
+#     if add_line:
+#         x_end, y_end, z_end = to_loc
+#         line = draw_line_3d(ax, x_start, y_start, z_start, x_end, y_end, z_end, color=c)
+#     else:
+#         line = None
+
+#     return line
+
 
 def visualize_solution(
     solution: SolverResults,

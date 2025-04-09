@@ -14,8 +14,8 @@ def is_dimension(instance, attribute, value) -> None:
     """
     if not isinstance(value, int):
         raise ValueError(f"{value} is not an int")
-    if not value in [2, 3]:
-        raise ValueError(f"Value {value} is not 2 or 3")
+    # if not value in [2, 3]:
+    #     raise ValueError(f"Value {value} is not 2 or 3")
 
 
 def range_validator(instance, attribute, value):
@@ -173,7 +173,7 @@ def optional_float_validator(instance, attribute, value) -> None:
         None
     """
     if value is not None:
-        if not isinstance(value, float):
+        if not isinstance(value, (float, int)):
             raise ValueError(f"{value} is not a float")
 
 

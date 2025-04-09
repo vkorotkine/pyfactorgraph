@@ -1,3 +1,4 @@
+import py_factor_graph.data_associations as data_associations
 from typing import List, Dict, Set, Optional, Tuple, Union
 import attr
 import pickle
@@ -28,11 +29,9 @@ from py_factor_graph.variables import (
 from py_factor_graph.measurements import (
     PoseMeasurement2D,
     PoseMeasurement3D,
-    AmbiguousPoseMeasurement2D,
     PoseToLandmarkMeasurement2D,
     PoseToLandmarkMeasurement3D,
-    FGRangeMeasurement,
-    AmbiguousFGRangeMeasurement,
+    PoseToKnownLandmarkMeasurement2D,
     POSE_MEASUREMENT_TYPES,
     POSE_LANDMARK_MEASUREMENT_TYPES,
 )
@@ -58,8 +57,8 @@ from py_factor_graph.utils.plot_utils import (
     draw_landmark_variable_3d,
     draw_line,
     draw_line_3d,
-    draw_range_measurement,
-    draw_range_measurement_3d,
+    # draw_range_measurement,
+    # draw_range_measurement_3d,
 )
 from py_factor_graph.utils.attrib_utils import is_dimension
 from py_factor_graph.utils.logging_utils import logger
@@ -102,26 +101,28 @@ class FactorGraphData:
     existing_pose_variables: Set[str] = attr.ib(factory=set)
     existing_landmark_variables: Set[str] = attr.ib(factory=set)
 
+    vector_variables: List[data_associations.VectorVariable] = attr.ib(factory=list)
+    boolean_variables: List[data_associations.BooleanVariable] = attr.ib(factory=list)
+    toy_example_priors: List[data_associations.ToyExamplePrior] = attr.ib(factory=list)
+    # unknown data association measurements
+    unknown_data_association_measurements: List[
+        data_associations.UnknownDataAssociationMeasurement
+    ] = attr.ib(factory=list)
+    #
+    prior_pose_measurements: List[data_associations.PosePrior2D] = attr.ib(factory=list)
     # pose measurements
     odom_measurements: List[List[POSE_MEASUREMENT_TYPES]] = attr.ib(factory=list)
     loop_closure_measurements: List[POSE_MEASUREMENT_TYPES] = attr.ib(factory=list)
-    ambiguous_loop_closure_measurements: List[AmbiguousPoseMeasurement2D] = attr.ib(
-        factory=list
-    )  # TODO: extend to AmbiguousPoseMeasurement3D
 
     # pose to landmark measurements
     pose_landmark_measurements: List[POSE_LANDMARK_MEASUREMENT_TYPES] = attr.ib(
         factory=list
     )
-
-    # range measurements
-    range_measurements: List[FGRangeMeasurement] = attr.ib(factory=list)
-    ambiguous_range_measurements: List[AmbiguousFGRangeMeasurement] = attr.ib(
+    pose_known_landmark_measurements: List[PoseToKnownLandmarkMeasurement2D] = attr.ib(
         factory=list
     )
 
     # priors
-    pose_priors: List[POSE_PRIOR_TYPES] = attr.ib(factory=list)
     landmark_priors: List[LANDMARK_PRIOR_TYPES] = attr.ib(factory=list)
 
     # useful helper values
@@ -134,9 +135,33 @@ class FactorGraphData:
     max_measure_weight: Optional[float] = attr.ib(default=None)
     min_measure_weight: Optional[float] = attr.ib(default=None)
 
+    def summarize(self):
+        line = "Factor Graph Data Summary\n"
+        line += f"Pose Variables: {len(self.pose_variables)}\n"
+        line += f"Landmark Variables: {len(self.landmark_variables)}\n"
+        line += f"Odom Measurements: {len(self.odom_measurements)}\n"
+        line += (
+            f"Pose to landmark measurements: {len(self.pose_landmark_measurements)}\n"
+        )
+        line += f"Pose to known landmark measurements: {len(self.pose_known_landmark_measurements)}\n"
+        line += f"Pose Priors: {len(self.prior_pose_measurements)}\n"
+        line += f"Unknown Data Association Measurements: {len(self.unknown_data_association_measurements)}\n"
+        line += "\n"
+        return line
+
     def __str__(self):
         line = "Factor Graph Data\n"
 
+        # Summary
+        line += f"Pose Variables: {len(self.pose_variables)}\n"
+        line += f"Landmark Variables: {len(self.landmark_variables)}\n"
+        line += f"Odom Measurements: {len(self.odom_measurements)}\n"
+        line += (
+            f"Pose to landmark measurements: {len(self.pose_landmark_measurements)}\n"
+        )
+        line += f"Pose Priors: {len(self.pose_priors)}\n"
+        line += f"Unknown Data Association Measurements: {len(self.unknown_data_association_measurements)}\n"
+        line += "\n"
         # add pose variables
         line += f"Pose Variables: {len(self.pose_variables)}\n"
         for x in self.pose_variables:
@@ -156,16 +181,16 @@ class FactorGraphData:
         line += "\n"
 
         # add loop closure measurements
-        line += f"Loop Closure Measurements: {len(self.loop_closure_measurements)}\n"
-        for x in self.loop_closure_measurements:
-            line += f"{x}\n"
-        line += "\n"
+        # line += f"Loop Closure Measurements: {len(self.loop_closure_measurements)}\n"
+        # for x in self.loop_closure_measurements:
+        #     line += f"{x}\n"
+        # line += "\n"
 
         # add ambiguous loop closure measurements
-        line += f"Ambiguous Loop Closure Measurements: {len(self.ambiguous_loop_closure_measurements)}\n"
-        for x in self.ambiguous_loop_closure_measurements:
-            line += f"{x}\n"
-        line += "\n"
+        # line += f"Ambiguous Loop Closure Measurements: {len(self.ambiguous_loop_closure_measurements)}\n"
+        # for x in self.ambiguous_loop_closure_measurements:
+        #     line += f"{x}\n"
+        # line += "\n"
 
         # add pose to landmark measurements
         line += (
@@ -176,18 +201,18 @@ class FactorGraphData:
         line += "\n"
 
         # add range measurements
-        line += f"Range Measurements: {len(self.range_measurements)}\n"
-        for x in self.range_measurements:
-            line += f"{x}\n"
-        line += "\n"
+        # line += f"Range Measurements: {len(self.range_measurements)}\n"
+        # for x in self.range_measurements:
+        #     line += f"{x}\n"
+        # line += "\n"
 
         # add ambiguous range measurements
-        line += (
-            f"Ambiguous Range Measurements: {len(self.ambiguous_range_measurements)}\n"
-        )
-        for x in self.ambiguous_range_measurements:
-            line += f"{x}\n"
-        line += "\n"
+        # line += (
+        #     f"Ambiguous Range Measurements: {len(self.ambiguous_range_measurements)}\n"
+        # )
+        # for x in self.ambiguous_range_measurements:
+        #     line += f"{x}\n"
+        # line += "\n"
 
         # add pose priors
         line += f"Pose Priors: {len(self.pose_priors)}\n"
@@ -196,11 +221,15 @@ class FactorGraphData:
         line += "\n"
 
         # add landmark priors
-        line += f"Landmark Priors: {len(self.landmark_priors)}\n"
-        for x in self.landmark_priors:
-            line += f"{x}\n"
-        line += "\n"
+        # line += f"Landmark Priors: {len(self.landmark_priors)}\n"
+        # for x in self.landmark_priors:
+        #     line += f"{x}\n"
+        # line += "\n"
 
+        # add unknown data association measurements
+        line += f"Unknown Data Association Measurements: {len(self.unknown_data_association_measurements)}\n"
+        for x in self.unknown_data_association_measurements:
+            line += f"{x}\n"
         # add dimension
         line += f"Dimension: {self.dimension}\n\n"
         return line
@@ -236,7 +265,7 @@ class FactorGraphData:
             f"Measurements: {num_odom_measurements} odom, "
             f"{num_pose_landmark_measurements} pose to landmark, "
             f"{num_range_measurements} range, {num_loop_closures} loop closures, "
-            f"Interrobot loop closures: {self.interrobot_loop_closure_info}, "
+            f"Interrobot loop closures: {self.interrobot_loop_closure_info}"
         )
         msg = f"{robots_line} || {variables_line} || {measurements_line}"
         logger.info(msg)
@@ -351,30 +380,6 @@ class FactorGraphData:
         return info
 
     @property
-    def interrobot_range_info(self) -> str:
-        """Returns a string containing information about the inter-robot range measurements.
-
-        Returns:
-            str: a string containing information about the inter-robot range measurements
-        """
-        range_counts: Dict[Tuple[str, str], int] = {}
-        for association, range_meas in self.range_measures_association_dict.items():
-            if "L" in association[0] or "L" in association[1]:
-                continue
-
-            if association[0] > association[1]:
-                association = (association[1], association[0])
-            range_counts[association] = range_counts.get(association, 0) + len(
-                range_meas
-            )
-
-        info = ""
-        for assoc, cnt in range_counts.items():
-            info += f"{assoc}: {cnt} range measurements"
-
-        return info
-
-    @property
     def num_pose_landmark_measurements(self) -> int:
         """Returns the number of pose to landmark measurements.
 
@@ -432,19 +437,6 @@ class FactorGraphData:
         """
         landmark_var_dict = {x.name: x for x in self.landmark_variables}
         return landmark_var_dict
-
-    @property
-    def pose_and_landmark_variables_dict(
-        self,
-    ) -> Dict[str, Union[POSE_VARIABLE_TYPES, LANDMARK_VARIABLE_TYPES]]:
-        """Returns the pose and landmark variables as a dict.
-
-        Returns:
-            Dict[str, Union[POSE_VARIABLE_TYPES, LANDMARK_VARIABLE_TYPES]]: a dict of the pose and landmark variables
-        """
-        pose_var_dict = self.pose_variables_dict
-        landmark_var_dict = self.landmark_variables_dict
-        return {**pose_var_dict, **landmark_var_dict}
 
     @property
     def variable_true_positions_dict(self) -> Dict[str, Tuple]:
@@ -516,62 +508,6 @@ class FactorGraphData:
         measures_dict: Dict[Tuple[str, str], List[POSE_LANDMARK_MEASUREMENT_TYPES]] = {}
         for measure in self.pose_landmark_measurements:
             association = (measure.pose_name, measure.landmark_name)
-            if association not in measures_dict:
-                measures_dict[association] = []
-            measures_dict[association].append(measure)
-        return measures_dict
-
-    # TODO: function is redundant and should be deprecated
-    @property
-    def pose_to_range_measures_dict(self) -> Dict[str, List[FGRangeMeasurement]]:
-        """Returns a mapping from pose variables to their range measurements.
-
-        Returns:
-            Dict[str, List[FGRangeMeasurement]]: the mapping from pose variables to their range measurements
-        """
-        measures_dict: Dict[str, List[FGRangeMeasurement]] = {}
-        for measure in self.range_measurements:
-            associated_pose = measure.association[0]
-            if associated_pose not in measures_dict:
-                measures_dict[associated_pose] = []
-            measures_dict[associated_pose].append(measure)
-        return measures_dict
-
-    # TODO: function is redundant and should be deprecated
-    @property
-    def both_poses_to_range_measures_dict(self) -> Dict[str, List[FGRangeMeasurement]]:
-        """Returns a mapping from both pose variables to their range
-        measurements.
-
-        Ex. ("A1", "B3"): [range measurement] -> {"A1": [range measurement], "B3": [range measurement]}
-
-        Returns:
-            Dict[str, List[FGRangeMeasurement]]: the mapping from both pose variables to their range measurements
-        """
-        measures_dict: Dict[str, List[FGRangeMeasurement]] = {}
-        for measure in self.range_measurements:
-            association_1 = measure.association[0]
-            association_2 = measure.association[1]
-            if association_1 not in measures_dict:
-                measures_dict[association_1] = []
-            measures_dict[association_1].append(measure)
-            if association_2 not in measures_dict:
-                measures_dict[association_2] = []
-            measures_dict[association_2].append(measure)
-        return measures_dict
-
-    @property
-    def range_measures_association_dict(
-        self,
-    ) -> Dict[Tuple[str, str], List[FGRangeMeasurement]]:
-        """Returns a mapping from range measurement associations to their range measurements.
-
-        Returns:
-            Dict[Tuple[str, str], List[FGRangeMeasurement]]: the mapping from range measurement associations to their range measurements.
-        """
-        measures_dict: Dict[Tuple[str, str], List[FGRangeMeasurement]] = {}
-        for measure in self.range_measurements:
-            association = measure.association
             if association not in measures_dict:
                 measures_dict[association] = []
             measures_dict[association].append(measure)
@@ -932,77 +868,6 @@ class FactorGraphData:
             max_loop_closure_weight, min_loop_closure_weight
         )
 
-    # TODO: Add similar checks to add_odom_measurement and add_loop_closure. Extend function to AmbiguousPoseMeasurement3D and test
-    def add_ambiguous_loop_closure(
-        self, ambiguous_loop_closure: AmbiguousPoseMeasurement2D
-    ) -> None:
-        """Adds an ambiguous loop closure measurement to the list of ambiguous loop closure measurements.
-
-        Args:
-            measure (AmbiguousPoseMeasurement2D): the ambiguous loop closure measurement to add
-        """
-        self.ambiguous_loop_closure_measurements.append(ambiguous_loop_closure)
-
-    def add_pose_landmark_measurement(
-        self, pose_landmark_meas: POSE_LANDMARK_MEASUREMENT_TYPES
-    ) -> None:
-        """Adds a pose to landmark measurement to the list of pose to landmark measurements.
-
-        Args:
-            pose_landmark_meas (POSE_MEASUREMENT_TYPES): the pose to landmark measurement to add
-        """
-        self._check_measurement_dimension(pose_landmark_meas)
-        self.pose_landmark_measurements.append(pose_landmark_meas)
-
-        # check that we are not adding a measurement between variables that do not exist
-        pose_name = pose_landmark_meas.pose_name
-        assert self.pose_exists(pose_name), f"{pose_name} does not exist"
-        landmark_name = pose_landmark_meas.landmark_name
-        assert self.landmark_exists(landmark_name), f"{landmark_name} does not exist"
-
-        # update max and min measurement weights
-        pose_landmark_weight = pose_landmark_meas.translation_precision
-        self._update_max_min_measurement_weights(
-            pose_landmark_weight, pose_landmark_weight
-        )
-
-    def add_range_measurement(self, range_meas: FGRangeMeasurement) -> None:
-        """Adds a range measurement to the list of range measurements.
-
-        Args:
-            range_meas (FGRangeMeasurement): the range measurement to add
-        """
-
-        # check that we are not adding a measurement between variables that exist
-        var1, var2 = range_meas.association
-        assert self.is_pose_or_landmark(var1)
-        assert self.is_pose_or_landmark(var2)
-        self.range_measurements.append(range_meas)
-
-        # update max and min measurement weights
-        if (
-            self.max_measure_weight is None
-            or self.max_measure_weight < range_meas.weight
-        ):
-            self.max_measure_weight = range_meas.weight
-
-        if (
-            self.min_measure_weight is None
-            or self.min_measure_weight > range_meas.weight
-        ):
-            self.min_measure_weight = range_meas.weight
-
-    # TODO: implement similar checks to add_range_measurement
-    def add_ambiguous_range_measurement(
-        self, measure: AmbiguousFGRangeMeasurement
-    ) -> None:
-        """Adds an ambiguous range measurement to the list of ambiguous range measurements.
-
-        Args:
-            measure (AmbiguousFGRangeMeasurement): the ambiguous range measurement to add
-        """
-        self.ambiguous_range_measurements.append(measure)
-
     def add_pose_prior(self, pose_prior: POSE_PRIOR_TYPES) -> None:
         """Adds a pose prior to the list of pose priors.
 
@@ -1113,45 +978,6 @@ class FactorGraphData:
             # return the formatted string
             return line
 
-        def get_ambiguous_pose_measurement_string(
-            pose_measure: AmbiguousPoseMeasurement2D,
-        ) -> str:
-            """This is a utility function to get a formatted string to write to EFG
-            formats for measurements which can be represented by poses (i.e.
-            odometry and loop closures.
-
-            Args:
-                pose (SE2Pose): the measurement
-
-            Returns:
-                str: the formatted string representation of the pose measurement
-            """
-            line = "Factor AmbiguousDataAssociationFactor "
-
-            cur_id = pose_measure.base_pose
-            line += f"Observer {cur_id} "
-
-            true_measure_id = pose_measure.true_to_pose
-            measure_id = pose_measure.measured_to_pose
-            line += f"Observed {true_measure_id} {measure_id} "
-            line += "Weights 0.5 0.5 Binary SE2RelativeGaussianLikelihoodFactor Observation "
-
-            # add in odometry info
-            del_x = pose_measure.x
-            del_y = pose_measure.y
-            del_theta = pose_measure.theta
-            line += f"{del_x:.15f} {del_y:.15f} {del_theta:.15f} "
-
-            # add in covariance info (Sigma == covariance)
-            line += "Sigma "
-            covar_info = pose_measure.covariance.flatten()
-            for val in covar_info:
-                line += f"{val:.15f} "
-
-            line += "\n"
-            # return the formatted string
-            return line
-
         def get_pose_var_string(pose: PoseVariable2D) -> str:
             """
             Takes a pose and returns a string in the desired format
@@ -1198,118 +1024,6 @@ class FactorGraphData:
             line += "\n"
 
             return line
-
-        def get_range_measurement_string(
-            range_measure: FGRangeMeasurement,
-        ) -> str:
-            """Returns the string representing a range factor based on the provided
-            range measurement and the association information.
-
-            Args:
-                range_measure (FGRangeMeasurement): the measurement info (value and
-                    stddev)
-
-            Returns:
-                str: the line representing the factor
-            """
-
-            robot_id, measure_id = range_measure.association
-
-            # Factor SE2R2RangeGaussianLikelihoodFactor X0 L1 14.14214292904807 0.5
-            if "L" in measure_id:
-                # L is reserved for landmark names
-                range_factor_type = "SE2R2RangeGaussianLikelihoodFactor"
-            else:
-                # ID starts with other letters are robots
-                range_factor_type = "SE2SE2RangeGaussianLikelihoodFactor"
-            line = f"Factor {range_factor_type} "
-            line += f"{robot_id} {measure_id} "
-            line += f"{range_measure.dist:.15f} {range_measure.stddev:.15f}\n"
-
-            return line
-
-        def get_ambiguous_range_measurement_string(
-            range_measure: AmbiguousFGRangeMeasurement,
-        ) -> str:
-            """Returns the string representing an ambiguous range factor based on
-            the provided range measurement and the association information.
-
-            Args:
-                range_measure (AmbiguousFGRangeMeasurement): the measurement info
-                    (value and stddev)
-
-            Returns:
-                str: the line representing the factor
-            """
-
-            true_robot_id, true_beacon_id = range_measure.true_association
-            measured_robot_id, measured_beacon_id = range_measure.measured_association
-
-            assert (
-                true_robot_id == measured_robot_id
-            ), "the robot id must always be correct"
-            assert (
-                "L" in true_beacon_id and "L" in measured_beacon_id
-            ), "right now only considering ambiguous measurements to landmarks"
-
-            # Factor AmbiguousDataAssociationFactor Observer X1 Observed L1 L2
-            # Weights 0.5 0.5 Binary SE2R2RangeGaussianLikelihoodFactor
-            # Observation 24.494897460297107 Sigma 0.5
-            line = "Factor AmbiguousDataAssociationFactor "
-            line += f"Observer {true_robot_id} "
-            line += f"Observed {true_beacon_id} {measured_beacon_id} "
-            line += "Weights 0.5 0.5 Binary SE2R2RangeGaussianLikelihoodFactor "
-            line += f"Observation {range_measure.dist:.15f} Sigma {range_measure.stddev:.15f}\n"
-
-            return line
-
-        file_writer = open(data_file, "w")
-
-        for pose_chain in self.pose_variables:
-            for pose in pose_chain:
-                assert isinstance(pose, PoseVariable2D)
-                line = get_pose_var_string(pose)
-                file_writer.write(line)
-
-        for beacon in self.landmark_variables:
-            assert isinstance(beacon, LandmarkVariable2D)
-            line = get_beacon_var_string(beacon)
-            file_writer.write(line)
-
-        for prior in self.pose_priors:
-            assert isinstance(
-                prior, PosePrior2D
-            ), "3D priors not supported yet for efg format"
-            line = get_prior_to_pin_string(prior)
-            file_writer.write(line)
-
-        for odom_chain in self.odom_measurements:
-            for odom_measure in odom_chain:
-                assert isinstance(odom_measure, PoseMeasurement2D)
-                line = get_normal_pose_measurement_string(odom_measure)
-                file_writer.write(line)
-
-        for loop_closure in self.loop_closure_measurements:
-            assert isinstance(loop_closure, PoseMeasurement2D)
-            line = get_normal_pose_measurement_string(loop_closure)
-            file_writer.write(line)
-
-        for amb_odom_measure in self.ambiguous_loop_closure_measurements:
-            assert isinstance(amb_odom_measure, AmbiguousPoseMeasurement2D)
-            line = get_ambiguous_pose_measurement_string(amb_odom_measure)
-            file_writer.write(line)
-
-        for range_measure in self.range_measurements:
-            assert isinstance(range_measure, FGRangeMeasurement)
-            line = get_range_measurement_string(range_measure)
-            file_writer.write(line)
-
-        for amb_range_measure in self.ambiguous_range_measurements:
-            assert isinstance(amb_range_measure, AmbiguousFGRangeMeasurement)
-            line = get_ambiguous_range_measurement_string(amb_range_measure)
-            file_writer.write(line)
-
-        file_writer.close()
 
     # TODO: deprecate for pyfg_text.py
     def _save_to_pickle_format(self, data_file: str) -> None:

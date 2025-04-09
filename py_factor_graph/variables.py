@@ -13,10 +13,9 @@ from py_factor_graph.utils.attrib_utils import (
     make_rot_matrix_validator,
     make_variable_name_validator,
 )
-import scipy.spatial as spatial
 
 
-@attr.s()
+@attr.s(frozen=False)
 class PoseVariable2D:
     """A variable which is a robot pose
 
@@ -28,18 +27,35 @@ class PoseVariable2D:
     """
 
     name: str = attr.ib(validator=make_variable_name_validator("pose"))
-    true_position: Tuple[float, float] = attr.ib()
-    true_theta: float = attr.ib(validator=attr.validators.instance_of(float))
+    true_position: np.ndarray = attr.ib(default=None)
+    true_theta: float = attr.ib(default=None)
+    estimated_position: np.ndarray = attr.ib(default=None)
+    estimated_theta: float = attr.ib(default=None)
     timestamp: Optional[float] = attr.ib(default=None)
 
-    @true_position.validator
-    def _check_true_position(self, attribute, value):
-        if len(value) != 2:
-            raise ValueError(f"true_position should be a tuple of length 2")
-        assert all(isinstance(x, float) for x in value)
+    def error(self):
+        e_rot = (
+            np.linalg.norm(
+                self.true_rotation_matrix - self.estimated_rotation_matrix, "fro"
+            )
+            ** 2
+        )
+        e_pos = (
+            np.linalg.norm(
+                np.array(self.true_position) - np.array(self.estimated_position), 2
+            )
+            ** 2
+        )
+        return e_rot + e_pos
+
+    # @true_position.validator
+    # def _check_true_position(self, attribute, value):
+    #     if len(value) != 2:
+    #         raise ValueError(f"true_position should be a tuple of length 2")
+    #     assert all(isinstance(x, (float, int)) for x in value)
 
     @property
-    def rotation_matrix(self) -> np.ndarray:
+    def true_rotation_matrix(self) -> np.ndarray:
         """
         Get the rotation matrix for the measurement
         """
@@ -51,11 +67,23 @@ class PoseVariable2D:
         )
 
     @property
+    def estimated_rotation_matrix(self) -> np.ndarray:
+        """
+        Get the rotation matrix for the measurement
+        """
+        return np.array(
+            [
+                [np.cos(self.estimated_theta), -np.sin(self.estimated_theta)],
+                [np.sin(self.estimated_theta), np.cos(self.estimated_theta)],
+            ]
+        )
+
+    @property
     def position_vector(self) -> np.ndarray:
         """
         Get the position vector for the measurement
         """
-        return np.array(self.true_position)
+        return self.true_position
 
     @property
     def true_x(self) -> float:
@@ -77,7 +105,7 @@ class PoseVariable2D:
         return quat
 
     @property
-    def transformation_matrix(self) -> np.ndarray:
+    def true_transformation_matrix(self) -> np.ndarray:
         """Returns the transformation matrix representing the true latent pose
         of this variable
 
@@ -85,9 +113,23 @@ class PoseVariable2D:
             np.ndarray: the transformation matrix
         """
         T = np.eye(3)
-        T[0:2, 0:2] = self.rotation_matrix
-        T[0, 2] = self.true_x
-        T[1, 2] = self.true_y
+        T[0:2, 0:2] = self.true_rotation_matrix
+        T[0, 2] = self.true_position[0]
+        T[1, 2] = self.true_position[1]
+        return T
+
+    @property
+    def estimated_transformation_matrix(self) -> np.ndarray:
+        """Returns the transformation matrix representing the true latent pose
+        of this variable
+
+        Returns:
+            np.ndarray: the transformation matrix
+        """
+        T = np.eye(3)
+        T[0:2, 0:2] = self.estimated_rotation_matrix
+        T[0, 2] = self.estimated_position[0]
+        T[1, 2] = self.estimated_position[1]
         return T
 
     def transform(self, T: np.ndarray) -> "PoseVariable2D":
@@ -107,7 +149,7 @@ class PoseVariable2D:
         return PoseVariable2D(self.name, pos2d, new_theta, self.timestamp)
 
 
-@attr.s()
+@attr.s(frozen=False)
 class PoseVariable3D:
     """A variable which is a robot pose
 
@@ -162,12 +204,6 @@ class PoseVariable3D:
         return self.true_position[2]
 
     @property
-    def yaw(self) -> float:
-        rot_mat = self.rotation_matrix
-        yaw = spatial.transform.Rotation.from_matrix(rot_mat).as_euler("zyx")[0]
-        return yaw
-
-    @property
     def true_quat(self) -> np.ndarray:
         rot = self.rotation_matrix
         quat = get_quat_from_rotation_matrix(rot)
@@ -206,7 +242,7 @@ class PoseVariable3D:
         return PoseVariable3D(self.name, pos3d, new_rotation, self.timestamp)
 
 
-@attr.s()
+@attr.s(frozen=False)
 class LandmarkVariable2D:
     """A variable which is a landmark
 
@@ -217,12 +253,13 @@ class LandmarkVariable2D:
 
     name: str = attr.ib(validator=make_variable_name_validator("landmark"))
     true_position: Tuple[float, float] = attr.ib()
+    estimated_position: Tuple[float, float] = attr.ib(default=None)
 
     @true_position.validator
     def _check_true_position(self, attribute, value):
         if len(value) != 2:
             raise ValueError(f"true_position should be a tuple of length 2")
-        assert all(isinstance(x, float) for x in value)
+        assert all((isinstance(x, float) or isinstance(x, int)) for x in value)
 
     @property
     def true_x(self):
@@ -233,7 +270,7 @@ class LandmarkVariable2D:
         return self.true_position[1]
 
 
-@attr.s()
+@attr.s(frozen=True)
 class LandmarkVariable3D:
     """A variable which is a landmark
 
@@ -266,26 +303,3 @@ class LandmarkVariable3D:
 
 POSE_VARIABLE_TYPES = Union[PoseVariable2D, PoseVariable3D]
 LANDMARK_VARIABLE_TYPES = Union[LandmarkVariable2D, LandmarkVariable3D]
-
-
-def dist_between_variables(
-    var1: Union[POSE_VARIABLE_TYPES, LANDMARK_VARIABLE_TYPES],
-    var2: Union[POSE_VARIABLE_TYPES, LANDMARK_VARIABLE_TYPES],
-) -> float:
-    """Returns the distance between two variables"""
-    if isinstance(var1, PoseVariable2D) or isinstance(var1, PoseVariable3D):
-        pos1 = var1.position_vector
-    elif isinstance(var1, LandmarkVariable2D) or isinstance(var1, LandmarkVariable3D):
-        pos1 = np.array(var1.true_position)
-    else:
-        raise ValueError(f"Variable {var1} not supported")
-
-    if isinstance(var2, PoseVariable2D) or isinstance(var2, PoseVariable3D):
-        pos2 = var2.position_vector
-    elif isinstance(var2, LandmarkVariable2D) or isinstance(var2, LandmarkVariable3D):
-        pos2 = np.array(var2.true_position)
-    else:
-        raise ValueError(f"Variable {var2} not supported")
-
-    dist = np.linalg.norm(pos1 - pos2).astype(float)
-    return dist
